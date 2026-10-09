@@ -15,19 +15,37 @@
 
     <section class="add-task">
       <form id="task-form">
-        <input
-          type="text"
-          id="task-input"
-          placeholder="What needs to be done?"
-          autocomplete="off"
-          maxlength="200"
-        />
-        <button type="submit">Add Task</button>
+        <div class="form-row form-row--main">
+          <input
+            type="text"
+            id="task-input"
+            placeholder="What needs to be done?"
+            autocomplete="off"
+            maxlength="200"
+          />
+          <button type="submit">Add Task</button>
+        </div>
+        <div class="form-row form-row--meta">
+          <select id="priority-input" aria-label="Priority">
+            <option value="High">High</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="Low">Low</option>
+          </select>
+          <input type="date" id="due-date-input" aria-label="Due date" />
+        </div>
       </form>
     </section>
 
     <section class="task-list">
       <div id="task-count" class="task-count"></div>
+      <div class="filter-tabs" role="tablist">
+        <button class="filter-tab active" data-filter="all" role="tab">All</button>
+        <button class="filter-tab" data-filter="pending" role="tab">Pending</button>
+        <button class="filter-tab" data-filter="completed" role="tab">Completed</button>
+      </div>
+      <div class="search-wrap">
+        <input type="search" id="search-input" placeholder="Search tasks…" aria-label="Search tasks" />
+      </div>
       <ul id="tasks"></ul>
       <p id="empty-msg" class="empty-msg hidden">No tasks yet. Add one above!</p>
     </section>
