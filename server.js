@@ -13,16 +13,16 @@ app.get('/api/tasks', (req, res) => {
 });
 
 app.post('/api/tasks', (req, res) => {
-  const { title } = req.body;
+  const { title, priority, due_date } = req.body;
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'Title is required' });
   }
-  const task = db.insert(title.trim());
+  const task = db.insert(title.trim(), priority, due_date);
   res.status(201).json(task);
 });
 
 app.put('/api/tasks/:id', (req, res) => {
-  const task = db.update(req.params.id, req.body.done);
+  const task = db.update(req.params.id, req.body);
   if (!task) return res.status(404).json({ error: 'Task not found' });
   res.json(task);
 });
