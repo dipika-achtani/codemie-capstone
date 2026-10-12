@@ -7,28 +7,33 @@ const emptyMsg = document.getElementById('empty-msg');
 const taskCount = document.getElementById('task-count');
 const sortControl = document.getElementById('sort-control');
 
+// --------------------------------------------------------------------------
 // Module-level state
+// --------------------------------------------------------------------------
 let allTasks = [];
 let currentFilter = 'all';
 let currentSort = 'default';
-let currentEditLi = null;
+let currentEditLi = null; // tracks the li currently in inline-edit mode
 
-// ----------------------------------------------------------------------
-// Data fetching
-// ----------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// Priority weight helper
+// --------------------------------------------------------------------------
+const PRIORITY_WEIGHT = { High: 1, Medium: 2, Low: 3 };
+
+// --------------------------------------------------------------------------
+// Fetch all tasks from the server and re-render
+// --------------------------------------------------------------------------
 async function fetchTasks() {
   const res = await fetch('/api/tasks');
   allTasks = await res.json();
   renderTasks(applyFilterAndSort(allTasks));
 }
 
-// ----------------------------------------------------------------------
-// Filter & Sort
-// ----------------------------------------------------------------------
-const PRIORITY_WEIGHT = { High: 1, Medium: 2, Low: 3 };
-
+// --------------------------------------------------------------------------
+// Filter + Sort pipeline
+// --------------------------------------------------------------------------
 function applyFilterAndSort(tasks) {
-  // Filter
+  // 1. Filter
   let result = tasks.slice();
   if (currentFilter === 'active') {
     result = result.filter(t => !t.done);
@@ -36,7 +41,7 @@ function applyFilterAndSort(tasks) {
     result = result.filter(t => t.done);
   }
 
-  // Sort
+  // 2. Sort
   if (currentSort === 'priority') {
     result.sort((a, b) => {
       const wa = PRIORITY_WEIGHT[a.priority] || 2;
@@ -46,7 +51,7 @@ function applyFilterAndSort(tasks) {
   } else if (currentSort === 'due_date') {
     result.sort((a, b) => {
       if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1;
+      if (!a.due_date) return 1;  // nulls last
       if (!b.due_date) return -1;
       return new Date(a.due_date) - new Date(b.due_date);
     });
@@ -55,10 +60,11 @@ function applyFilterAndSort(tasks) {
   return result;
 }
 
-// ----------------------------------------------------------------------
-// Render
-// ----------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// Render task list
+// --------------------------------------------------------------------------
 function renderTasks(tasks) {
+  currentEditLi = null;
   taskList.innerHTML = '';
 
   if (tasks.length === 0) {
@@ -69,7 +75,7 @@ function renderTasks(tasks) {
 
   emptyMsg.classList.add('hidden');
   const pending = allTasks.filter(t => !t.done).length;
-  taskCount.textContent = `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} – ${pending} remaining`;
+  taskCount.textContent = `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} — ${pending} remaining`;
 
   tasks.forEach(task => {
     const li = document.createElement('li');
@@ -81,10 +87,11 @@ function renderTasks(tasks) {
     checkbox.checked = Boolean(task.done);
     checkbox.addEventListener('change', () => toggleTask(task.id, checkbox.checked));
 
-    // Title span with dblclick for inline edit
+    // Title span with double-click inline-edit
     const titleSpan = document.createElement('span');
     titleSpan.className = 'title';
     titleSpan.textContent = task.title;
+    titleSpan.title = 'Double-click to edit';
     titleSpan.addEventListener('dblclick', () => startInlineEdit(li, task));
 
     // Priority badge
@@ -93,48 +100,43 @@ function renderTasks(tasks) {
     badge.className = `priority-badge priority-${priority.toLowerCase()}`;
     badge.textContent = priority;
 
-    // Due date
+    // Due date label
     const dueDateVal = task.due_date || null;
+    let dueDateEl = null;
+    if (dueDateVal) {
+      dueDateEl = document.createElement('span');
+      dueDateEl.className = 'due-date';
+      const [y, m, d] = dueDateVal.split('-');
+      const date = new Date(Number(y), Number(m) - 1, Number(d));
+      dueDateEl.textContent = 'Due: ' + date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
 
     // Delete button
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete';
-    deleteBtn.textContent = '❕';
+    deleteBtn.textContent = '\u2315';
     deleteBtn.title = 'Delete task';
     deleteBtn.addEventListener('click', () => deleteTask(task.id));
 
     li.appendChild(checkbox);
     li.appendChild(titleSpan);
     li.appendChild(badge);
-
-    if (dueDateVal) {
-      const dueSpan = document.createElement('span');
-      dueSpan.className = 'due-date';
-      dueSpan.textContent = formatDate(dueDateVal);
-      li.appendChild(dueSpan);
-    }
-
+    if (dueDateEl) li.appendChild(dueDateEl);
     li.appendChild(deleteBtn);
     taskList.appendChild(li);
   });
 }
 
-function formatDate(dateStr) {
-  const [y, m, d] = dateStr.split('-');
-  const date = new Date(Number(y), Number(m) - 1, Number(d));
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-// ----------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // Inline editing
-// ----------------------------------------------------------------------
+// --------------------------------------------------------------------------
 function startInlineEdit(li, task) {
   // Cancel any other open edit first
   if (currentEditLi && currentEditLi !== li) {
-    cancelEdit(currentEditLi);
+    cancelOpenEdit();
   }
-
   currentEditLi = li;
+
   const titleSpan = li.querySelector('span.title');
   if (!titleSpan) return;
 
@@ -150,52 +152,60 @@ function startInlineEdit(li, task) {
   input.focus();
   input.select();
 
+  let committed = false;
+
   function commitEdit() {
+    if (committed) return;
+    committed = true;
     const newTitle = input.value.trim();
     if (newTitle && newTitle !== originalTitle) {
       updateTaskTitle(task.id, newTitle);
     } else {
-      restoreSpan(li, input, originalTitle, task);
+      restoreTitleSpan(li, input, originalTitle, task);
     }
     currentEditLi = null;
   }
 
-  function cancelEditHandler() {
-    restoreSpan(li, input, originalTitle, task);
+  function cancelEdit() {
+    if (committed) return;
+    committed = true;
+    restoreTitleSpan(li, input, originalTitle, task);
     currentEditLi = null;
   }
 
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
-    if (e.key === 'Escape') { e.preventDefault(); cancelEditHandler(); }
+    if (e.key === 'Enter')  { e.preventDefault(); commitEdit(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
   });
 
   input.addEventListener('blur', () => {
-    // Small timeout to let keydown fire first
     setTimeout(() => {
       if (li.contains(input)) commitEdit();
     }, 100);
   });
 }
 
-function restoreSpan(li, input, originalTitle, task) {
+function restoreTitleSpan(li, input, originalTitle, task) {
   const span = document.createElement('span');
   span.className = 'title';
   span.textContent = originalTitle;
+  span.title = 'Double-click to edit';
   span.addEventListener('dblclick', () => startInlineEdit(li, task));
   li.replaceChild(span, input);
 }
 
-function cancelEdit(li) {
-  const input = li.querySelector('input.title-edit');
-  if (!input) return;
-  const originalTitle = input.defaultValue;
-  restoreSpan(li, input, originalTitle, { title: originalTitle });
+function cancelOpenEdit() {
+  if (!currentEditLi) return;
+  const input = currentEditLi.querySelector('input.title-edit');
+  if (input) {
+    restoreTitleSpan(currentEditLi, input, input.defaultValue, { title: input.defaultValue });
+  }
+  currentEditLi = null;
 }
 
-// ----------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // API actions
-// ----------------------------------------------------------------------
+// --------------------------------------------------------------------------
 async function addTask(title, priority, due_date) {
   const res = await fetch('/api/tasks', {
     method: 'POST',
@@ -203,16 +213,7 @@ async function addTask(title, priority, due_date) {
     body: JSON.stringify({ title, priority, due_date: due_date || null })
   });
   if (!res.ok) return;
-  fetchTasks();
-}
-
-async function toggleTask(id, done) {
-  await fetch('/api/tasks/${id}', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ done })
-  });
-  fetchTasks();
+  await fetchTasks();
 }
 
 async function updateTaskTitle(id, title) {
@@ -221,31 +222,39 @@ async function updateTaskTitle(id, title) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title })
   });
-  if (res.ok) fetchTasks();
+  if (res.ok) await fetchTasks();
+}
+
+async function toggleTask(id, done) {
+  await fetch(`/api/tasks/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ done })
+  });
+  await fetchTasks();
 }
 
 async function deleteTask(id) {
   if (!confirm('Are you sure you want to delete this task?')) return;
-  await fetch('/api/tasks/${id}', { method: 'DELETE' });
-  fetchTasks();
+  await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+  await fetchTasks();
 }
 
-// ----------------------------------------------------------------------
+// --------------------------------------------------------------------------
 // Event listeners
-// ----------------------------------------------------------------------
+// --------------------------------------------------------------------------
 taskForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const title = taskInput.value.trim();
   if (!title) return;
   const priority = taskPriority.value;
-  const dueDate = taskDueDate.value;
+  const due_date = taskDueDate.value || null;
   taskInput.value = '';
   taskPriority.value = 'Medium';
   taskDueDate.value = '';
-  addTask(title, priority, dueDate);
+  addTask(title, priority, due_date);
 });
 
-// Filter buttons
 document.querySelectorAll('.filter-controls button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-controls button').forEach(b => b.classList.remove('active'));
@@ -255,7 +264,6 @@ document.querySelectorAll('.filter-controls button').forEach(btn => {
   });
 });
 
-// Sort control
 sortControl.addEventListener('change', () => {
   currentSort = sortControl.value;
   renderTasks(applyFilterAndSort(allTasks));
