@@ -1,6 +1,6 @@
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // DOM references
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 const taskList    = document.getElementById('tasks');
 const taskForm    = document.getElementById('task-form');
 const taskInput   = document.getElementById('task-input');
@@ -10,12 +10,12 @@ const emptyMsg    = document.getElementById('empty-msg');
 const taskCount   = document.getElementById('task-count');
 const sortControl = document.getElementById('sort-control');
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Module-level state (CC-116)
-// ---------------------------------------------------------------------------
-let allTasks = [];
-let currentFilter = 'all';
-let currentSort   = 'default';
+// ----------------------------------------------------------------------------
+let allTasks      = [];         // full unfiltered list from server
+get currentFilter = 'all';     // 'all' | 'active' | 'completed'
+let currentSort   = 'default';  // 'default' | 'priority' | 'due_date'
 
 // Tracks the <li> currently in inline-edit mode (CC-115)
 let currentEditLi = null;
@@ -23,18 +23,18 @@ let currentEditLi = null;
 // Priority weight for sorting: High = 1, Medium = 2, Low = 3
 const PRIORITY_WEIGHT = { High: 1, Medium: 2, Low: 3 };
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Data fetching
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 async function fetchTasks() {
   const res = await fetch('/api/tasks');
   allTasks = await res.json();
   renderTasks(applyFilterAndSort(allTasks));
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // CC-116: Filter & Sort
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 function applyFilterAndSort(tasks) {
   // 1. Filter
   let result = tasks.slice();
@@ -64,10 +64,10 @@ function applyFilterAndSort(tasks) {
   return result;
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // CC-116: Render tasks with priority badge + due-date label
 // CC-115: Inline edit on dblclick
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 function renderTasks(tasks) {
   taskList.innerHTML = '';
   currentEditLi = null;
@@ -111,17 +111,17 @@ function renderTasks(tasks) {
     if (dueDate) {
       dueSpan = document.createElement('span');
       dueSpan.className = 'due-date';
-      // Format YYYY-MM-DD to locale date string (e.g. "Aug 15, 2025")
-      const d = new Date(dueDate + 'T00:00:00'); // force local timezone
-      dueSpan.textContent = `\u230a ${d.toLocaleDateString()}`;
+      // Parse YYYY-MM-DD as UTC to avoid off-by-one day in negative UTC offsets
+      const d = new Date(dueDate + 'T00:00:00Z');
+      dueSpan.textContent = '\u1f4c5 ' + d.toUTCString().slice(5, 16);
     }
 
     // Delete button with confirmation guard (CC-115)
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete';
-    deleteBtn.textContent = '✕✕✕️';
+    deleteBtn.textContent = '\u2315';
     deleteBtn.title = 'Delete task';
-    deleteBtn.addEventListener('click', () => deleteTask(task.id));
+    deleteBtn.addEventListener('click', () => deleteTask(task.id, task.title));
 
     li.appendChild(checkbox);
     li.appendChild(titleSpan);
@@ -132,9 +132,9 @@ function renderTasks(tasks) {
   });
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // CC-115: Inline edit helpers
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 /**
  * Replace the title span in `li` with a focused input.
@@ -143,7 +143,7 @@ function renderTasks(tasks) {
 function startInlineEdit(li, task) {
   // Cancel any other open edit without saving
   if (currentEditLi && currentEditLi !== li) {
-    cancelInlineEdit(currentEditLi);
+    cancelInlineEdit(currentEditLi, task);
   }
 
   const titleSpan = li.querySelector('span.title');
@@ -160,34 +160,40 @@ function startInlineEdit(li, task) {
   input.select();
   currentEditLi = li;
 
-  // Save on Enter, cancel on Escape
+  // Flag to prevent double-fire when Enter/Escape triggers blur
+  let handled = false;
+
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      handled = true;
       commitInlineEdit(li, task, input);
     } else if (e.key === 'Escape') {
-      cancelInlineEdit(li);
+      e.preventDefault();
+      handled = true;
+      cancelInlineEdit(li, task);
     }
   });
 
-  // Save on blur (same logic as Enter)
   input.addEventListener('blur', () => {
-    commitInlineEdit(li, task, input);
+    if (!handled) {
+      handled = true;
+      commitInlineEdit(li, task, input);
+    }
   });
 }
 
 /**
  * Restore the original title span without saving.
  */
-function cancelInlineEdit(li) {
+function cancelInlineEdit(li, task) {
   const input = li.querySelector('input.title-edit');
   if (!input) return;
-  // Rebuild the original span from the input's original value
-  // We store the original title in a data attribute set during startInlineEdit
-  const originalTitle = input.dataset.originalTitle;
   const span = document.createElement('span');
   span.className = 'title';
-  span.textContent = originalTitle;
+  span.textContent = task.title;
+  span.title = 'Double-click to edit';
+  span.addEventListener('dblclick', () => startInlineEdit(li, task));
   li.replaceChild(span, input);
   if (currentEditLi === li) currentEditLi = null;
 }
@@ -198,17 +204,17 @@ function cancelInlineEdit(li) {
  * - otherwise -> restore original without API call
  */
 function commitInlineEdit(li, task, input) {
-  // Guard against blur firing after Enter already processed
+  // Guard against blur firing after Enter/Escape already removed the input
   if (!li.contains(input)) return;
 
   const newTitle = input.value.trim();
   if (!newTitle || newTitle === task.title) {
     // Empty or unchanged -> restore without saving
-    cancelInlineEdit(li);
+    cancelInlineEdit(li, task);
     return;
   }
 
-  // Remove input immediately to prevent double-fire on blur
+  // Replace input with a temporary span showing new title while saving
   const span = document.createElement('span');
   span.className = 'title';
   span.textContent = newTitle;
@@ -218,11 +224,11 @@ function commitInlineEdit(li, task, input) {
   updateTaskTitle(task.id, newTitle);
 }
 
-// ---------------------------------------------------------------------------
-// CC-115: API calls
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// API calls
+// ----------------------------------------------------------------------------
 
-/** Sends PUT /api/tasks/:id with { title } and re-renders on success. */
+/** CC-115: Sends PUT /api/tasks/:id with { title } and re-renders on success. */
 async function updateTaskTitle(id, title) {
   const res = await fetch(`/api/tasks/${id}`, {
     method: 'PUT',
@@ -245,19 +251,17 @@ async function toggleTask(id, done) {
 }
 
 /**
- * Deletes a task after a confirmation guard (CC-115).
+ * CC-115: Deletes a task after a confirmation guard.
  * If the user dismisses the prompt, no DELETE request is issued.
  */
-async function deleteTask(id) {
-  if (!window.confirm('Delete this task? This cannot be undone.')) {
-    return;
-  }
+async function deleteTask(id, title) {
+  if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
   await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
   await fetchTasks();
 }
 
 /**
- * Adds a new task with priority and due_date (CC-116).
+ * CC-116: Adds a new task with priority and due_date.
  */
 async function addTask(title, priority, due_date) {
   const res = await fetch('/api/tasks', {
@@ -269,9 +273,9 @@ async function addTask(title, priority, due_date) {
   await fetchTasks();
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 // Event listeners
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 
 // Add-task form submit
 taskForm.addEventListener('submit', (e) => {
@@ -279,7 +283,7 @@ taskForm.addEventListener('submit', (e) => {
   const title = taskInput.value.trim();
   if (!title) return;
   const priority = prioritySel.value;
-  const dueDate  = dueDateInput.value; // YYYY-MM-DD or eympty string
+  const dueDate  = dueDateInput.value || null; // YYYY-MM-DD or null
   taskInput.value = '';
   prioritySel.value = 'Medium';
   dueDateInput.value = '';
