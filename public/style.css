@@ -34,6 +34,10 @@ header .subtitle {
   font-size: 0.95rem;
 }
 
+/* --------------------------------------------------------------------------
+   Add-task card
+   -------------------------------------------------------------------------- */
+
 .add-task {
   background: #fff;
   border-radius: 12px;
@@ -44,10 +48,16 @@ header .subtitle {
 
 .add-task form {
   display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
-.add-task input {
+.form-row {
+  display: flex;
+  gap: 10px;
+}
+
+.add-task input[type="text"] {
   flex: 1;
   padding: 12px 16px;
   border: 1.5px solid #ddd;
@@ -57,11 +67,42 @@ header .subtitle {
   transition: border-color 0.2s;
 }
 
-.add-task input:focus {
+.add-task input[type="text"]:focus {
   border-color: #4f46e5;
 }
 
-.add-task button {
+.add-task input[type="date"] {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  color: #333;
+}
+
+.add-task input[type="date"]:focus {
+  border-color: #4f46e5;
+}
+
+.add-task select {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.add-task select:focus {
+  border-color: #4f46e5;
+}
+
+.add-task button[type="submit"] {
   padding: 12px 20px;
   background: #4f46e5;
   color: #fff;
@@ -74,9 +115,13 @@ header .subtitle {
   white-space: nowrap;
 }
 
-.add-task button:hover {
+.add-task button[type="submit"]:hover {
   background: #4338ca;
 }
+
+/* --------------------------------------------------------------------------
+   Task list card
+   -------------------------------------------------------------------------- */
 
 .task-list {
   background: #fff;
@@ -85,12 +130,75 @@ header .subtitle {
   overflow: hidden;
 }
 
+.task-list-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .task-count {
-  padding: 14px 20px;
   font-size: 0.85rem;
   color: #666;
-  border-bottom: 1px solid #f0f0f0;
 }
+
+/* --------------------------------------------------------------------------
+   Filter controls (CC-116)
+   -------------------------------------------------------------------------- */
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.filter-controls button {
+  padding: 6px 14px;
+  border: 1.5px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  color: #555;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.filter-controls button:hover {
+  border-color: #4f46e5;
+  color: #4f46e5;
+}
+
+.filter-controls button.active {
+  background: #4f46e5;
+  color: #fff;
+  border-color: #4f46e5;
+}
+
+#sort-control {
+  padding: 6px 10px;
+  border: 1.5px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#sort-control:focus {
+  border-color: #4f46e5;
+}
+
+/* --------------------------------------------------------------------------
+   Task list items
+   -------------------------------------------------------------------------- */
 
 ul#tasks {
   list-style: none;
@@ -126,12 +234,69 @@ ul#tasks li .title {
   font-size: 0.95rem;
   word-break: break-word;
   transition: color 0.2s;
+  cursor: pointer;
 }
 
 ul#tasks li.done .title {
   text-decoration: line-through;
   color: #aaa;
 }
+
+/* --------------------------------------------------------------------------
+   Inline-edit input (CC-115)
+   -------------------------------------------------------------------------- */
+
+ul#tasks li input.title-edit {
+  flex: 1;
+  font-size: 0.95rem;
+  border: 1.5px solid #4f46e5;
+  border-radius: 6px;
+  padding: 2px 8px;
+  outline: none;
+}
+
+/* --------------------------------------------------------------------------
+   Priority badges (CC-116)
+   -------------------------------------------------------------------------- */
+
+.priority-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.priority-high {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.priority-medium {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.priority-low {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+/* --------------------------------------------------------------------------
+   Due date label (CC-116)
+   -------------------------------------------------------------------------- */
+
+.due-date {
+  font-size: 0.8rem;
+  color: #888;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Delete button
+   -------------------------------------------------------------------------- */
 
 ul#tasks li button.delete {
   background: none;
@@ -150,6 +315,10 @@ ul#tasks li button.delete:hover {
   color: #ef4444;
   background: #fef2f2;
 }
+
+/* --------------------------------------------------------------------------
+   Empty state
+   -------------------------------------------------------------------------- */
 
 .empty-msg {
   text-align: center;

@@ -18,7 +18,7 @@ let currentFilter = 'all';
 let currentSort = 'default';
 let currentEditLi = null; // tracks the li currently in inline-edit mode
 
-// Priority weight for sorting
+// Priority weight for sorting (High=1, Medium=2, Low=3)
 const PRIORITY_WEIGHT = { High: 1, Medium: 2, Low: 3 };
 
 // --------------------------------------------------------------------------
@@ -31,10 +31,10 @@ async function fetchTasks() {
 }
 
 // --------------------------------------------------------------------------
-// Filter & Sort
+// Filter & Sort (CC-116)
 // --------------------------------------------------------------------------
 function applyFilterAndSort(tasks) {
-  // 1. Filter
+  // 1. Filter by done state
   let result = tasks;
   if (currentFilter === 'active') {
     result = tasks.filter(t => !t.done);
@@ -76,7 +76,7 @@ function renderTasks(tasks) {
 
   emptyMsg.classList.add('hidden');
   const pending = allTasks.filter(t => !t.done).length;
-  taskCount.textContent = `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} —  ${pending} remaining`;
+  taskCount.textContent = `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} \u2014 ${pending} remaining`;
 
   tasks.forEach(task => {
     const li = document.createElement('li');
@@ -88,20 +88,20 @@ function renderTasks(tasks) {
     checkbox.checked = Boolean(task.done);
     checkbox.addEventListener('change', () => toggleTask(task.id, checkbox.checked));
 
-    // Title span with double-click to edit
+    // Title span with double-click to edit (CC-115)
     const titleSpan = document.createElement('span');
     titleSpan.className = 'title';
     titleSpan.textContent = task.title;
     titleSpan.title = 'Double-click to edit';
     titleSpan.addEventListener('dblclick', () => startInlineEdit(li, task));
 
-    // Priority badge (defensive: treat missing priority as Medium)
+    // Priority badge — defensive: treat missing priority as Medium (CC-116)
     const priority = task.priority || 'Medium';
     const badge = document.createElement('span');
     badge.className = `priority-badge priority-${priority.toLowerCase()}`;
     badge.textContent = priority;
 
-    // Due date label (defensive: treat missing due_date as null)
+    // Due date label — defensive: treat missing due_date as null (CC-116)
     const dueDate = task.due_date || null;
     let dueSpan = null;
     if (dueDate) {
@@ -113,7 +113,7 @@ function renderTasks(tasks) {
     // Delete button
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete';
-    deleteBtn.textContent = '✕✹';
+    deleteBtn.textContent = '\u2715';
     deleteBtn.title = 'Delete task';
     deleteBtn.addEventListener('click', () => deleteTask(task.id));
 
@@ -154,9 +154,10 @@ function startInlineEdit(li, task) {
   async function commitEdit() {
     const newTitle = input.value.trim();
     if (newTitle && newTitle !== originalTitle) {
+      // Non-empty and changed: persist via API
       await updateTaskTitle(task.id, newTitle);
     } else {
-      // Empty or not changed: restore original span
+      // Empty or unchanged: restore original span without API call
       li.replaceChild(titleSpan, input);
       currentEditLi = null;
     }
@@ -178,6 +179,7 @@ function startInlineEdit(li, task) {
 
   let blurCommitted = false;
   input.addEventListener('blur', async () => {
+    // Guard against double-fire when keydown already handled it
     if (!blurCommitted) {
       blurCommitted = true;
       await commitEdit();
@@ -229,6 +231,7 @@ async function updateTaskTitle(id, title) {
 }
 
 async function deleteTask(id) {
+  // CC-115: confirmation guard before issuing DELETE
   if (!window.confirm('Are you sure you want to delete this task?')) {
     return;
   }
@@ -240,8 +243,9 @@ async function deleteTask(id) {
 // Utilities
 // --------------------------------------------------------------------------
 function formatDate(dateStr) {
-  const [y,m,d] = dateStr.split('-');
-  return new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString(undefined, {
+  // Parse YYYY-MM-DD without timezone shift
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
     month: 'short', day: 'numeric', year: 'numeric'
   });
 }
@@ -255,13 +259,14 @@ taskForm.addEventListener('submit', (e) => {
   if (!title) return;
   const priority = taskPriority.value;
   const dueDate = taskDueDate.value;
+  // Clear form inputs after reading values
   taskInput.value = '';
   taskPriority.value = 'Medium';
   taskDueDate.value = '';
   addTask(title, priority, dueDate);
 });
 
-// Filter buttons
+// Filter buttons (CC-116)
 document.querySelectorAll('.filter-controls button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-controls button').forEach(b => b.classList.remove('active'));
@@ -271,10 +276,13 @@ document.querySelectorAll('.filter-controls button').forEach(btn => {
   });
 });
 
-// Sort dropdown
+// Sort dropdown (CC-116)
 sortControl.addEventListener('change', () => {
   currentSort = sortControl.value;
   renderTasks(applyFilterAndSort(allTasks));
 });
 
+// --------------------------------------------------------------------------
+// Init
+// --------------------------------------------------------------------------
 fetchTasks();
