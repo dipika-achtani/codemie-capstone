@@ -15,19 +15,43 @@
 
     <section class="add-task">
       <form id="task-form">
-        <input
-          type="text"
-          id="task-input"
-          placeholder="What needs to be done?"
-          autocomplete="off"
-          maxlength="200"
-        />
-        <button type="submit">Add Task</button>
+        <div class="form-row">
+          <input
+            type="text"
+            id="task-input"
+            placeholder="What needs to be done?"
+            autocomplete="off"
+            maxlength="200"
+          />
+          <button type="submit">Add Task</button>
+        </div>
+        <div class="form-row form-row-meta">
+          <select id="task-priority">
+            <option value="High">High Priority</option>
+            <option value="Medium" selected>Medium Priority</option>
+            <option value="Low">Low Priority</option>
+          </select>
+          <input type="date" id="task-due-date" />
+        </div>
       </form>
     </section>
 
     <section class="task-list">
-      <div id="task-count" class="task-count"></div>
+      <div class="task-list-header">
+        <div id="task-count" class="task-count"></div>
+        <div class="controls-row">
+          <div class="filter-controls">
+            <button type="button" data-filter="all" class="active">All</button>
+            <button type="button" data-filter="active">Active</button>
+            <button type="button" data-filter="completed">Completed</button>
+          </div>
+          <select id="sort-control">
+            <option value="default">Default Order</option>
+            <option value="priority">Sort by Priority</option>
+            <option value="due_date">Sort by Due Date</option>
+          </select>
+        </div>
+      </div>
       <ul id="tasks"></ul>
       <p id="empty-msg" class="empty-msg hidden">No tasks yet. Add one above!</p>
     </section>
