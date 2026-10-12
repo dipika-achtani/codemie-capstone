@@ -22,11 +22,29 @@
           autocomplete="off"
           maxlength="200"
         />
+        <select id="task-priority">
+          <option value="High">High</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="Low">Low</option>
+        </select>
+        <input type="date" id="task-due-date" />
         <button type="submit">Add Task</button>
       </form>
     </section>
 
     <section class="task-list">
+      <div class="task-controls">
+        <div class="filter-controls">
+          <button type="button" data-filter="all" class="active">All</button>
+          <button type="button" data-filter="active">Active</button>
+          <button type="button" data-filter="completed">Completed</button>
+        </div>
+        <select id="sort-control">
+          <option value="default">Default Order</option>
+          <option value="priority">Sort by Priority</option>
+          <option value="due_date">Sort by Due Date</option>
+        </select>
+      </div>
       <div id="task-count" class="task-count"></div>
       <ul id="tasks"></ul>
       <p id="empty-msg" class="empty-msg hidden">No tasks yet. Add one above!</p>
