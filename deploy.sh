@@ -29,7 +29,7 @@ echo "Waiting for server to be ready..."
 for i in $(seq 1 10); do
   if curl -sf http://localhost:$PORT/api/tasks >/dev/null 2>&1; then
     echo ""
-    echo "=== DEPLOYMENT SUCCESSUFL ==="
+    echo "=== DEPLOYMENT SUCCESSFUL ==="
     echo "App URL: http://localhost:$PORT"
     echo "Logs:    server.log"
     exit 0
