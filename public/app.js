@@ -1,17 +1,67 @@
 const taskList = document.getElementById('tasks');
 const taskForm = document.getElementById('task-form');
 const taskInput = document.getElementById('task-input');
+const taskPriority = document.getElementById('task-priority');
+const taskDueDate = document.getElementById('task-due-date');
 const emptyMsg = document.getElementById('empty-msg');
 const taskCount = document.getElementById('task-count');
+const sortControl = document.getElementById('sort-control');
 
+// Module-level state
+let allTasks = [];
+let currentFilter = 'all';
+let currentSort = 'default';
+let currentEditLi = null;
+
+// --------------------------------------------------------------------------
+// Data fetching
+// --------------------------------------------------------------------------
 async function fetchTasks() {
   const res = await fetch('/api/tasks');
-  const tasks = await res.json();
-  renderTasks(tasks);
+  allTasks = await res.json();
+  renderTasks(applyFilterAndSort(allTasks));
 }
 
+// --------------------------------------------------------------------------
+// Filter & Sort
+// --------------------------------------------------------------------------
+const PRIORITY_WEIGHT = { High: 1, Medium: 2, Low: 3 };
+
+function applyFilterAndSort(tasks) {
+  let result = tasks.slice();
+
+  // Filter
+  if (currentFilter === 'active') {
+    result = result.filter(t => !t.done);
+  } else if (currentFilter === 'completed') {
+    result = result.filter(t => t.done);
+  }
+
+  // Sort
+  if (currentSort === 'priority') {
+    result.sort((a, b) => {
+      const pa = PRIORITY_WEIGHT[a.priority || 'Medium'];
+      const pb = PRIORITY_WEIGHT[b.priority || 'Medium'];
+      return pa - pb;
+    });
+  } else if (currentSort === 'due_date') {
+    result.sort((a, b) => {
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(a.due_date) - new Date(b.due_date);
+    });
+  }
+
+  return result;
+}
+
+// --------------------------------------------------------------------------
+// Render
+// --------------------------------------------------------------------------
 function renderTasks(tasks) {
   taskList.innerHTML = '';
+  currentEditLi = null;
 
   if (tasks.length === 0) {
     emptyMsg.classList.remove('hidden');
@@ -20,8 +70,8 @@ function renderTasks(tasks) {
   }
 
   emptyMsg.classList.add('hidden');
-  const pending = tasks.filter(t => !t.done).length;
-  taskCount.textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''} — ${pending} remaining`;
+  const pending = allTasks.filter(t => !t.done).length;
+  taskCount.textContent = `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} – ${pending} remaining`;
 
   tasks.forEach(task => {
     const li = document.createElement('li');
@@ -32,34 +82,124 @@ function renderTasks(tasks) {
     checkbox.checked = Boolean(task.done);
     checkbox.addEventListener('change', () => toggleTask(task.id, checkbox.checked));
 
-    const title = document.createElement('span');
-    title.className = 'title';
-    title.textContent = task.title;
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'title';
+    titleSpan.textContent = task.title;
+
+    // Double-click to edit
+    titleSpan.addEventListener('dblclick', () => startEdit(task, li, titleSpan));
+
+    // Priority badge
+    const priority = task.priority || 'Medium';
+    const badge = document.createElement('span');
+    badge.className = `priority-badge priority-${priority.toLowerCase()}`;
+    badge.textContent = priority;
+
+    li.appendChild(checkbox);
+    li.appendChild(titleSpan);
+    li.appendChild(badge);
+
+    // Due date
+    if (task.due_date) {
+      const dueSpan = document.createElement('span');
+      dueSpan.className = 'due-date';
+      dueSpan.textContent = new Date(task.due_date + 'T00:00:00').toLocaleDateString();
+      li.appendChild(dueSpan);
+    }
 
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete';
-    deleteBtn.textContent = '✕';
+    deleteBtn.textContent = '❕';
     deleteBtn.title = 'Delete task';
     deleteBtn.addEventListener('click', () => deleteTask(task.id));
 
-    li.appendChild(checkbox);
-    li.appendChild(title);
     li.appendChild(deleteBtn);
     taskList.appendChild(li);
   });
 }
 
-async function addTask(title) {
+// --------------------------------------------------------------------------
+// Inline Editing
+// --------------------------------------------------------------------------
+function startEdit(task, li, titleSpan) {
+  // Cancel any existing edit first
+  if (currentEditLi && currentEditLi !== li) {
+    cancelEdit(currentEditLi);
+  }
+
+  currentEditLi = li;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'title-edit';
+  input.value = task.title;
+
+  li.replaceChild(input, titleSpan);
+  input.focus();
+  input.select();
+
+  function commit() {
+    const newTitle = input.value.trim();
+    if (newTitle && newTitle !== task.title) {
+      updateTaskTitle(task.id, newTitle);
+    } else {
+      li.replaceChild(titleSpan, input);
+      currentEditLi = null;
+    }
+  }
+
+  function cancel() {
+    li.replaceChild(titleSpan, input);
+    currentEditLi = null;
+  }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { cancel(); }
+  });
+
+  input.addEventListener('blur', () => {
+    // Small timeout so Escape keydown fires before blur
+    setTimeout(() => {
+      if (document.contains(input)) commit();
+    }, 100);
+  });
+}
+
+function cancelEdit(li) {
+  const input = li.querySelector('input.title-edit');
+  if (input) {
+    const span = document.createElement('span');
+    span.className = 'title';
+    span.textContent = input.defaultValue;
+    li.replaceChild(span, input);
+  }
+  currentEditLi = null;
+}
+
+async function updateTaskTitle(id, title) {
+  const res = await fetch(`/api/tasks/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title })
+  });
+  if (res.ok) fetchTasks();
+}
+
+// --------------------------------------------------------------------------
+// Task Actions
+// --------------------------------------------------------------------------
+async function addTask(title, priority, due_date) {
   const res = await fetch('/api/tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title })
+    body: JSON.stringify({ title, priority, due_date: due_date || null })
   });
   if (!res.ok) return;
   fetchTasks();
 }
 
-async function toggleTask(id, done) {
+alsync function toggleTask(id, done) {
   await fetch(`/api/tasks/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -68,17 +208,41 @@ async function toggleTask(id, done) {
   fetchTasks();
 }
 
-async function deleteTask(id) {
+alsync function deleteTask(id) {
+  if (!confirm('Are you sure you want to delete this task?')) return;
   await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
   fetchTasks();
 }
 
+// --------------------------------------------------------------------------
+// Event Listeners
+// --------------------------------------------------------------------------
 taskForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const title = taskInput.value.trim();
   if (!title) return;
+  const priority = taskPriority.value;
+  const due_date = taskDueDate.value || null;
   taskInput.value = '';
-  addTask(title);
+  taskPriority.value = 'Medium';
+  taskDueDate.value = '';
+  addTask(title, priority, due_date);
+});
+
+// Filter buttons
+document.querySelectorAll('.filter-controls button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-controls button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderTasks(applyFilterAndSort(allTasks));
+  });
+});
+
+// Sort control
+sortControl.addEventListener('change', () => {
+  currentSort = sortControl.value;
+  renderTasks(applyFilterAndSort(allTasks));
 });
 
 fetchTasks();
