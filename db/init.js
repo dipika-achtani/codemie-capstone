@@ -19,18 +19,19 @@ module.exports = {
   all() {
     return load().tasks.slice().reverse();
   },
-  insert(title) {
+  insert(title, priority = 'Medium', due_date = null) {
     const data = load();
-    const task = { id: data.nextId++, title, done: 0, created_at: new Date().toISOString() };
+    const task = { id: data.nextId++, title, done: 0, priority, due_date, created_at: new Date().toISOString() };
     data.tasks.push(task);
     save(data);
     return task;
   },
-  update(id, done) {
+  update(id, fields) {
     const data = load();
     const task = data.tasks.find(t => t.id === Number(id));
     if (!task) return null;
-    task.done = done ? 1 : 0;
+    if ('done' in fields) task.done = fields.done ? 1 : 0;
+    if ('title' in fields) task.title = fields.title;
     save(data);
     return task;
   },

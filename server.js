@@ -13,16 +13,33 @@ app.get('/api/tasks', (req, res) => {
 });
 
 app.post('/api/tasks', (req, res) => {
-  const { title } = req.body;
+  const { title, priority, due_date } = req.body;
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'Title is required' });
   }
-  const task = db.insert(title.trim());
+  const validPriorities = ['High', 'Medium', 'Low'];
+  const resolvedPriority = priority || 'Medium';
+  if (!validPriorities.includes(resolvedPriority)) {
+    return res.status(400).json({ error: 'Invalid priority value' });
+  }
+  if (due_date !== undefined && due_date !== null) {
+    if (isNaN(Date.parse(due_date))) {
+      return res.status(400).json({ error: 'Invalid due_date format' });
+    }
+  }
+  const task = db.insert(title.trim(), resolvedPriority, due_date || null);
   res.status(201).json(task);
 });
 
 app.put('/api/tasks/:id', (req, res) => {
-  const task = db.update(req.params.id, req.body.done);
+  const { done, title } = req.body;
+  if (title !== undefined && (!title || !title.trim())) {
+    return res.status(400).json({ error: 'Title cannot be empty' });
+  }
+  const fields = {};
+  if (done !== undefined) fields.done = done;
+  if (title !== undefined) fields.title = title.trim();
+  const task = db.update(req.params.id, fields);
   if (!task) return res.status(404).json({ error: 'Task not found' });
   res.json(task);
 });
