@@ -7,37 +7,26 @@ const emptyMsg = document.getElementById('empty-msg');
 const taskCount = document.getElementById('task-count');
 const sortControl = document.getElementById('sort-control');
 
-// Module-level state
 let allTasks = [];
 let currentFilter = 'all';
 let currentSort = 'default';
 let currentEditLi = null;
 
-// --------------------------------------------------------------------------
-// Data fetching
-// --------------------------------------------------------------------------
+const PRIORITY_WEIGHT = { High: 1, Medium: 2, Low: 3 };
+
 async function fetchTasks() {
   const res = await fetch('/api/tasks');
   allTasks = await res.json();
   renderTasks(applyFilterAndSort(allTasks));
 }
 
-// --------------------------------------------------------------------------
-// Filter & Sort
-// --------------------------------------------------------------------------
-const PRIORITY_WEIGHT = { High: 1, Medium: 2, Low: 3 };
-
 function applyFilterAndSort(tasks) {
   let result = tasks.slice();
-
-  // Filter
   if (currentFilter === 'active') {
     result = result.filter(t => !t.done);
   } else if (currentFilter === 'completed') {
     result = result.filter(t => t.done);
   }
-
-  // Sort
   if (currentSort === 'priority') {
     result.sort((a, b) => {
       const pa = PRIORITY_WEIGHT[a.priority || 'Medium'];
@@ -52,93 +41,70 @@ function applyFilterAndSort(tasks) {
       return new Date(a.due_date) - new Date(b.due_date);
     });
   }
-
   return result;
 }
 
-// --------------------------------------------------------------------------
-// Render
-// --------------------------------------------------------------------------
 function renderTasks(tasks) {
   taskList.innerHTML = '';
   currentEditLi = null;
-
   if (tasks.length === 0) {
     emptyMsg.classList.remove('hidden');
     taskCount.textContent = '';
     return;
   }
-
   emptyMsg.classList.add('hidden');
   const pending = allTasks.filter(t => !t.done).length;
-  taskCount.textContent = `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} – ${pending} remaining`;
-
+  taskCount.textContent = `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} -- ${pending} remaining`;
   tasks.forEach(task => {
     const li = document.createElement('li');
     if (task.done) li.classList.add('done');
-
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = Boolean(task.done);
     checkbox.addEventListener('change', () => toggleTask(task.id, checkbox.checked));
-
     const titleSpan = document.createElement('span');
     titleSpan.className = 'title';
     titleSpan.textContent = task.title;
-
-    // Double-click to edit
     titleSpan.addEventListener('dblclick', () => startEdit(task, li, titleSpan));
-
-    // Priority badge
     const priority = task.priority || 'Medium';
     const badge = document.createElement('span');
     badge.className = `priority-badge priority-${priority.toLowerCase()}`;
     badge.textContent = priority;
-
     li.appendChild(checkbox);
     li.appendChild(titleSpan);
     li.appendChild(badge);
-
-    // Due date
     if (task.due_date) {
       const dueSpan = document.createElement('span');
       dueSpan.className = 'due-date';
-      dueSpan.textContent = new Date(task.due_date + 'T00:00:00').toLocaleDateString();
+      dueSpan.textContent = new Date(task.due_date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
       li.appendChild(dueSpan);
     }
-
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete';
-    deleteBtn.textContent = '❕';
+    deleteBtn.textContent = 'x';
     deleteBtn.title = 'Delete task';
     deleteBtn.addEventListener('click', () => deleteTask(task.id));
-
     li.appendChild(deleteBtn);
     taskList.appendChild(li);
   });
 }
 
-// --------------------------------------------------------------------------
-// Inline Editing
-// --------------------------------------------------------------------------
 function startEdit(task, li, titleSpan) {
-  // Cancel any existing edit first
   if (currentEditLi && currentEditLi !== li) {
     cancelEdit(currentEditLi);
   }
-
   currentEditLi = li;
-
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'title-edit';
   input.value = task.title;
-
   li.replaceChild(input, titleSpan);
   input.focus();
   input.select();
-
+  let committed = false;
   function commit() {
+    if (committed) return;
+    committed = true;
     const newTitle = input.value.trim();
     if (newTitle && newTitle !== task.title) {
       updateTaskTitle(task.id, newTitle);
@@ -147,22 +113,18 @@ function startEdit(task, li, titleSpan) {
       currentEditLi = null;
     }
   }
-
   function cancel() {
+    if (committed) return;
+    committed = true;
     li.replaceChild(titleSpan, input);
     currentEditLi = null;
   }
-
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
     if (e.key === 'Escape') { cancel(); }
   });
-
   input.addEventListener('blur', () => {
-    // Small timeout so Escape keydown fires before blur
-    setTimeout(() => {
-      if (document.contains(input)) commit();
-    }, 100);
+    setTimeout(() => { if (document.contains(input)) commit(); }, 100);
   });
 }
 
@@ -186,9 +148,6 @@ async function updateTaskTitle(id, title) {
   if (res.ok) fetchTasks();
 }
 
-// --------------------------------------------------------------------------
-// Task Actions
-// --------------------------------------------------------------------------
 async function addTask(title, priority, due_date) {
   const res = await fetch('/api/tasks', {
     method: 'POST',
@@ -199,7 +158,7 @@ async function addTask(title, priority, due_date) {
   fetchTasks();
 }
 
-alsync function toggleTask(id, done) {
+async function toggleTask(id, done) {
   await fetch(`/api/tasks/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -208,15 +167,12 @@ alsync function toggleTask(id, done) {
   fetchTasks();
 }
 
-alsync function deleteTask(id) {
-  if (!confirm('Are you sure you want to delete this task?')) return;
+async function deleteTask(id) {
+  if (!window.confirm('Are you sure you want to delete this task?')) return;
   await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
   fetchTasks();
 }
 
-// --------------------------------------------------------------------------
-// Event Listeners
-// --------------------------------------------------------------------------
 taskForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const title = taskInput.value.trim();
@@ -229,7 +185,6 @@ taskForm.addEventListener('submit', (e) => {
   addTask(title, priority, due_date);
 });
 
-// Filter buttons
 document.querySelectorAll('.filter-controls button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-controls button').forEach(b => b.classList.remove('active'));
@@ -239,7 +194,6 @@ document.querySelectorAll('.filter-controls button').forEach(btn => {
   });
 });
 
-// Sort control
 sortControl.addEventListener('change', () => {
   currentSort = sortControl.value;
   renderTasks(applyFilterAndSort(allTasks));
