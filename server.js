@@ -5,12 +5,10 @@ const db = require('./db/init');
 const app = express();
 const PORT = 3000;
 
-assert = undefined; // not used
-
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const VALID_PRIORITIES= ['High', 'Medium', 'Low'];
+const VALID_PRIORITIES = ['High', 'Medium', 'Low'];
 
 app.get('/api/tasks', (req, res) => {
   res.json(db.all());
@@ -25,7 +23,7 @@ app.post('/api/tasks', (req, res) => {
   if (!VALID_PRIORITIES.includes(resolvedPriority)) {
     return res.status(400).json({ error: 'Invalid priority value' });
   }
-  if (due_date != null && due_date !== undefined && due_date !== '') {
+  if (due_date !== undefined && due_date !== null && due_date !== '') {
     const parsed = new Date(due_date);
     if (isNaN(parsed.getTime())) {
       return res.status(400).json({ error: 'Invalid due_date format' });

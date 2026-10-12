@@ -97,6 +97,7 @@ header .subtitle {
   background: #4338ca;
 }
 
+/* Task list */
 .task-list {
   background: #fff;
   border-radius: 12px;
@@ -269,6 +270,7 @@ ul#tasks li button.delete:hover {
   background: #fef2f2;
 }
 
+/* Misc */
 .empty-msg {
   text-align: center;
   padding: 40px 20px;

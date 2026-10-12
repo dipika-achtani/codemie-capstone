@@ -55,30 +55,36 @@ function renderTasks(tasks) {
   emptyMsg.classList.add('hidden');
   const pending = allTasks.filter(t => !t.done).length;
   taskCount.textContent = `${allTasks.length} task${allTasks.length !== 1 ? 's' : ''} -- ${pending} remaining`;
+
   tasks.forEach(task => {
     const li = document.createElement('li');
     if (task.done) li.classList.add('done');
+
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = Boolean(task.done);
     checkbox.addEventListener('change', () => toggleTask(task.id, checkbox.checked));
+
     const titleSpan = document.createElement('span');
     titleSpan.className = 'title';
     titleSpan.textContent = task.title;
     titleSpan.addEventListener('dblclick', () => startEdit(task, li, titleSpan));
+
     const priority = task.priority || 'Medium';
     const badge = document.createElement('span');
     badge.className = `priority-badge priority-${priority.toLowerCase()}`;
     badge.textContent = priority;
+
     li.appendChild(checkbox);
     li.appendChild(titleSpan);
     li.appendChild(badge);
     if (task.due_date) {
       const dueSpan = document.createElement('span');
       dueSpan.className = 'due-date';
-      dueSpan.textContent = new Date(task.due_date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      dueSpan.textContent = formatDate(task.due_date);
       li.appendChild(dueSpan);
     }
+
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete';
     deleteBtn.textContent = 'x';
@@ -101,7 +107,9 @@ function startEdit(task, li, titleSpan) {
   li.replaceChild(input, titleSpan);
   input.focus();
   input.select();
+
   let committed = false;
+
   function commit() {
     if (committed) return;
     committed = true;
@@ -113,12 +121,14 @@ function startEdit(task, li, titleSpan) {
       currentEditLi = null;
     }
   }
+
   function cancel() {
     if (committed) return;
     committed = true;
     li.replaceChild(titleSpan, input);
     currentEditLi = null;
   }
+
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
     if (e.key === 'Escape') { cancel(); }
@@ -171,6 +181,11 @@ async function deleteTask(id) {
   if (!window.confirm('Are you sure you want to delete this task?')) return;
   await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
   fetchTasks();
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 taskForm.addEventListener('submit', (e) => {
