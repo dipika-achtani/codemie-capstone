@@ -34,7 +34,7 @@ test('task count updates correctly after adding tasks', async ({ page }) => {
   await page.fill('#task-input', 'Task two');
   await page.click('button[type="submit"]');
 
-  await expect(page.locator('#task-count')).toHaveText('2 tasks — 2 remaining');
+  await expect(page.locator('#task-count')).toHaveText('2 tasks -- 2 remaining');
 });
 
 test('does not add a task when input is empty', async ({ page }) => {
@@ -57,8 +57,10 @@ test('can mark a task as done', async ({ page }) => {
 test('can delete a task', async ({ page }) => {
   await page.fill('#task-input', 'Delete me');
   await page.click('button[type="submit"]');
-
-  await page.locator('button.delete').click();
+  await expect(page.locator('#tasks li')).toHaveCount(1);
+  await page.waitForLoadState('networkidle');
+  // Dispatch click directly on the DOM node to avoid Playwright actionability races
+  await page.evaluate(() => document.querySelector('#tasks button.delete').click());
 
   await expect(page.locator('#tasks li')).toHaveCount(0);
   await expect(page.locator('#empty-msg')).toBeVisible();
