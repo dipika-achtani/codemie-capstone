@@ -131,7 +131,8 @@ function renderTasks(tasks) {
 
 /**
  * Build a title <span> with a dblclick listener for inline editing.
- * Extracted so it can be reused by cancelInlineEdit().
+ * Extracted so it can be reused by cancelInlineEdit() and startInlineEdit(),
+ * ensuring the dblclick handler always references the correct task object.
  */
 function makeTitleSpan(task) {
   const span = document.createElement('span');
@@ -171,7 +172,7 @@ function startInlineEdit(li, task) {
   currentEdit = { li, task };
 
   // Single flag to prevent both keydown (Enter) and the subsequent blur
-  // event from both calling commitEdit() for the same input.
+  // event from both calling commitEdit() for the same input session.
   let editSettled = false;
 
   async function commitEdit() {
@@ -246,7 +247,7 @@ async function toggleTask(id, done) {
   fetchTasks();
 }
 
-alsync function updateTaskTitle(id, title) {
+async function updateTaskTitle(id, title) {
   const res = await fetch(`/api/tasks/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
