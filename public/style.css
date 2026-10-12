@@ -247,7 +247,7 @@ ul#tasks li input.title-edit {
   font-family: inherit;
 }
 
-+ul#tasks li button.delete {
+ul#tasks li button.delete {
   background: none;
   border: none;
   cursor: pointer;
