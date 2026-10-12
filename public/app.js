@@ -16,7 +16,14 @@ const sortControl = document.getElementById('sort-control');
 let allTasks = [];
 let currentFilter = 'all';
 let currentSort = 'default';
-let currentEditLi = null; // tracks the li currently in inline-edit mode
+
+/**
+ * Tracks the <li> currently in inline-edit mode and the task object it
+ * belongs to.  Keeping the task reference here lets cancelInlineEdit()
+ * rebuild the span with the correct title without relying on a stale
+ * closure from a different startInlineEdit() invocation.
+ */
+let currentEdit = null; // { li: HTMLElement, task: object } | null
 
 // Priority weight for sorting (High=1, Medium=2, Low=3)
 const PRIORITY_WEIGHT = { High: 1, Medium: 2, Low: 3 };
@@ -66,7 +73,7 @@ function applyFilterAndSort(tasks) {
 // --------------------------------------------------------------------------
 function renderTasks(tasks) {
   taskList.innerHTML = '';
-  currentEditLi = null;
+  currentEdit = null;
 
   if (tasks.length === 0) {
     emptyMsg.classList.remove('hidden');
@@ -89,19 +96,15 @@ function renderTasks(tasks) {
     checkbox.addEventListener('change', () => toggleTask(task.id, checkbox.checked));
 
     // Title span with double-click to edit (CC-115)
-    const titleSpan = document.createElement('span');
-    titleSpan.className = 'title';
-    titleSpan.textContent = task.title;
-    titleSpan.title = 'Double-click to edit';
-    titleSpan.addEventListener('dblclick', () => startInlineEdit(li, task));
+    const titleSpan = makeTitleSpan(task);
 
-    // Priority badge — defensive: treat missing priority as Medium (CC-116)
+    // Priority badge -- defensive: treat missing priority as Medium (CC-116)
     const priority = task.priority || 'Medium';
     const badge = document.createElement('span');
     badge.className = `priority-badge priority-${priority.toLowerCase()}`;
     badge.textContent = priority;
 
-    // Due date label — defensive: treat missing due_date as null (CC-116)
+    // Due date label -- defensive: treat missing due_date as null (CC-116)
     const dueDate = task.due_date || null;
     let dueSpan = null;
     if (dueDate) {
@@ -113,7 +116,7 @@ function renderTasks(tasks) {
     // Delete button
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete';
-    deleteBtn.textContent = '\u2715';
+    deleteBtn.textContent = '\u00d7';
     deleteBtn.title = 'Delete task';
     deleteBtn.addEventListener('click', () => deleteTask(task.id));
 
@@ -126,13 +129,29 @@ function renderTasks(tasks) {
   });
 }
 
+/**
+ * Build a title <span> with a dblclick listener for inline editing.
+ * Extracted so it can be reused by cancelInlineEdit().
+ */
+function makeTitleSpan(task) {
+  const span = document.createElement('span');
+  span.className = 'title';
+  span.textContent = task.title;
+  span.title = 'Double-click to edit';
+  span.addEventListener('dblclick', () => {
+    const li = span.closest('li');
+    if (li) startInlineEdit(li, task);
+  });
+  return span;
+}
+
 // --------------------------------------------------------------------------
 // Inline Editing (CC-115)
 // --------------------------------------------------------------------------
 function startInlineEdit(li, task) {
   // Cancel any other open edit without saving
-  if (currentEditLi && currentEditLi !== li) {
-    cancelInlineEdit(currentEditLi, task);
+  if (currentEdit && currentEdit.li !== li) {
+    cancelInlineEdit(currentEdit.li, currentEdit.task);
   }
 
   const titleSpan = li.querySelector('.title');
@@ -149,23 +168,32 @@ function startInlineEdit(li, task) {
   li.replaceChild(input, titleSpan);
   input.focus();
   input.select();
-  currentEditLi = li;
+  currentEdit = { li, task };
+
+  // Single flag to prevent both keydown (Enter) and the subsequent blur
+  // event from both calling commitEdit() for the same input.
+  let editSettled = false;
 
   async function commitEdit() {
+    if (editSettled) return;
+    editSettled = true;
+
     const newTitle = input.value.trim();
     if (newTitle && newTitle !== originalTitle) {
       // Non-empty and changed: persist via API
       await updateTaskTitle(task.id, newTitle);
     } else {
       // Empty or unchanged: restore original span without API call
-      li.replaceChild(titleSpan, input);
-      currentEditLi = null;
+      li.replaceChild(makeTitleSpan(task), input);
+      currentEdit = null;
     }
   }
 
   function cancelEdit() {
-    li.replaceChild(titleSpan, input);
-    currentEditLi = null;
+    if (editSettled) return;
+    editSettled = true;
+    li.replaceChild(makeTitleSpan(task), input);
+    currentEdit = null;
   }
 
   input.addEventListener('keydown', async (e) => {
@@ -177,24 +205,23 @@ function startInlineEdit(li, task) {
     }
   });
 
-  let blurCommitted = false;
   input.addEventListener('blur', async () => {
-    // Guard against double-fire when keydown already handled it
-    if (!blurCommitted) {
-      blurCommitted = true;
-      await commitEdit();
-    }
+    // blur fires after keydown -- the editSettled flag ensures
+    // commitEdit() is only executed once per edit session.
+    await commitEdit();
   });
 }
 
+/**
+ * Cancel an open inline edit on a given <li> without saving.
+ * Rebuilds the title span from the provided task object so the correct
+ * title is always displayed regardless of which closure created the input.
+ */
 function cancelInlineEdit(li, task) {
   const input = li.querySelector('input.title-edit');
   if (!input) return;
-  const titleSpan = document.createElement('span');
-  titleSpan.className = 'title';
-  titleSpan.textContent = task.title;
-  li.replaceChild(titleSpan, input);
-  currentEditLi = null;
+  li.replaceChild(makeTitleSpan(task), input);
+  currentEdit = null;
 }
 
 // --------------------------------------------------------------------------
@@ -219,7 +246,7 @@ async function toggleTask(id, done) {
   fetchTasks();
 }
 
-async function updateTaskTitle(id, title) {
+alsync function updateTaskTitle(id, title) {
   const res = await fetch(`/api/tasks/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
