@@ -34,21 +34,24 @@ header .subtitle {
   font-size: 0.95rem;
 }
 
+/* ── Add Task Form ─────────────────────────────────────────────────────────── */
+
 .add-task {
   background: #fff;
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .add-task form {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.add-task input {
-  flex: 1;
+.add-task input[type="text"] {
+  flex: 1 1 180px;
   padding: 12px 16px;
   border: 1.5px solid #ddd;
   border-radius: 8px;
@@ -57,11 +60,42 @@ header .subtitle {
   transition: border-color 0.2s;
 }
 
-.add-task input:focus {
+.add-task input[type="text"]:focus {
   border-color: #4f46e5;
 }
 
-.add-task button {
+/* CC-120: priority select in form */
+.add-task select#priority-input {
+  padding: 10px 12px;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.add-task select#priority-input:focus {
+  border-color: #4f46e5;
+}
+
+/* CC-120: due date input in form */
+.add-task input[type="date"] {
+  padding: 10px 12px;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  color: #555;
+}
+
+.add-task input[type="date"]:focus {
+  border-color: #4f46e5;
+}
+
+.add-task button[type="submit"] {
   padding: 12px 20px;
   background: #4f46e5;
   color: #fff;
@@ -74,9 +108,44 @@ header .subtitle {
   white-space: nowrap;
 }
 
-.add-task button:hover {
+.add-task button[type="submit"]:hover {
   background: #4338ca;
 }
+
+/* ── CC-119: Filter Tabs ───────────────────────────────────────────────────── */
+
+.filter-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.filter-tabs button {
+  flex: 1;
+  padding: 9px 12px;
+  background: #fff;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.filter-tabs button:hover {
+  border-color: #4f46e5;
+  color: #4f46e5;
+}
+
+.filter-tabs button.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── Task List ─────────────────────────────────────────────────────────────── */
 
 .task-list {
   background: #fff;
@@ -85,11 +154,44 @@ header .subtitle {
   overflow: hidden;
 }
 
+/* CC-119: header row with count + sort control */
+.task-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .task-count {
-  padding: 14px 20px;
   font-size: 0.85rem;
   color: #666;
-  border-bottom: 1px solid #f0f0f0;
+}
+
+/* CC-119: sort control */
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.sort-control select {
+  padding: 5px 8px;
+  border: 1.5px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.sort-control select:focus {
+  border-color: #4f46e5;
 }
 
 ul#tasks {
@@ -101,7 +203,7 @@ ul#tasks li {
   align-items: center;
   padding: 14px 20px;
   border-bottom: 1px solid #f5f5f5;
-  gap: 12px;
+  gap: 10px;
   transition: background 0.15s;
 }
 
@@ -113,6 +215,15 @@ ul#tasks li:hover {
   background: #fafafa;
 }
 
+/* CC-120: overdue row highlight */
+ul#tasks li.overdue {
+  background: #fff5f5;
+}
+
+ul#tasks li.overdue:hover {
+  background: #fee2e2;
+}
+
 ul#tasks li input[type="checkbox"] {
   width: 18px;
   height: 18px;
@@ -121,16 +232,74 @@ ul#tasks li input[type="checkbox"] {
   flex-shrink: 0;
 }
 
+/* CC-120: priority badges */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.badge-high {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.badge-medium {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.badge-low {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
 ul#tasks li .title {
   flex: 1;
   font-size: 0.95rem;
   word-break: break-word;
   transition: color 0.2s;
+  cursor: default;
+}
+
+ul#tasks li .title:hover {
+  color: #4f46e5;
 }
 
 ul#tasks li.done .title {
   text-decoration: line-through;
   color: #aaa;
+}
+
+/* CC-120: due-date label */
+.due-date {
+  font-size: 0.78rem;
+  color: #888;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* CC-120: overdue due-date label */
+.due-date.overdue-label {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* CC-120: inline edit input */
+.inline-edit {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1.5px solid #4f46e5;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  outline: none;
+  background: #f5f3ff;
+  color: #1a1a2e;
 }
 
 ul#tasks li button.delete {
