@@ -22,12 +22,38 @@
           autocomplete="off"
           maxlength="200"
         />
+        <!-- CC-120: priority selector -->
+        <select id="priority-input" title="Priority">
+          <option value="High">High</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="Low">Low</option>
+        </select>
+        <!-- CC-120: due date picker -->
+        <input type="date" id="due-date-input" title="Due date" />
         <button type="submit">Add Task</button>
       </form>
     </section>
 
+    <!-- CC-119: filter tab bar -->
+    <div class="filter-tabs">
+      <button class="active" data-filter="all">All</button>
+      <button data-filter="active">Active</button>
+      <button data-filter="completed">Completed</button>
+    </div>
+
     <section class="task-list">
-      <div id="task-count" class="task-count"></div>
+      <div class="task-list-header">
+        <div id="task-count" class="task-count"></div>
+        <!-- CC-119: sort control -->
+        <div class="sort-control">
+          <label for="sort-select">Sort by:</label>
+          <select id="sort-select">
+            <option value="created">Date Created</option>
+            <option value="due">Due Date</option>
+            <option value="priority">Priority</option>
+          </select>
+        </div>
+      </div>
       <ul id="tasks"></ul>
       <p id="empty-msg" class="empty-msg hidden">No tasks yet. Add one above!</p>
     </section>
